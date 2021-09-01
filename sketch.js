@@ -9,7 +9,7 @@ window.onresize = () => {
 c.width = window.innerWidth
 c.height = window.innerHeight
 
-let shellInterval = 16;
+let shellInterval = 32;
 
 function dist(x1, y1, x2, y2) {
     return Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
@@ -28,8 +28,8 @@ class Particle {
         for (const particle of particles) {
             if (particle === this) continue;
 
-            let i_distance = 1 / ((this.x - particle.x) + (this.y - particle.y))
-            let force = particle.charge * this.charge * i_distance
+            let i_distance = 1 / dist(this.x, this.y, particle.x, particle.y)
+            let force = particle.charge * this.charge * i_distance ** 2
 
             this.vx += force * (this.x - particle.x) * i_distance
             this.vy += force * (this.y - particle.y) * i_distance
@@ -57,36 +57,15 @@ class Nucleus extends Particle {
 
             let distance = dist(this.x, this.y, particle.x, particle.y)
             
-            let closestShell = Math.round(distance / closestShell)
-            let shellOffset = 0
-
-            while (true) {
-                let shell = closestShell + shellOffset
-
-                if (shell > 0) {
-                    let amt_in_shell = this.shells[shell]
-
-                    if (amt_in_shell === undefined) {
-                        this.shells[shell] = 0
-                        amt_in_shell = 0
-                    }
-
-                    if (amt_in_shell < 2 * shell ** 2) {
-                        closestShell = closestShell + shellOffset
-                        particle.shell.set(this, closestShell)
-                        break
-                    }
-                }
-
-                shellOffset = Math.abs(shellOffset) * -Math.sign(shellOffset)
-            }
+            let closestShell = Math.max(Math.round(distance / shellInterval), 1)
 
             let dist_from_shell = closestShell * shellInterval - distance
+            let inverse_square = 1 / (distance * 0.5) ** 2
 
-            let force = dist_from_shell * (1 / distance ** 2)
+            let scale = (particle.vx * this.x + particle.vy * this.y) / distance
 
-            particle.vx += force * (this.x - particle.x)
-            particle.vy += force * (this.y - particle.y)
+            particle.vx += (-dist_from_shell * (this.x - particle.x) + scale * particle.vx / distance) * inverse_square
+            particle.vy += (-dist_from_shell * (this.y - particle.y) + scale * particle.vy / distance) * inverse_square
         }
     }
 }
@@ -108,9 +87,11 @@ class Electron extends Particle {
 
 let particles = []
 
-particles.push(new Nucleus(16 + 10 * 24, 16, 2))
-particles.push(new Electron(18 + 10 * 24, 24, 1))
-particles.push(new Electron(14 + 10 * 24, 10, 1))
+particles.push(new Nucleus(216 + 10 * 24, 216, 1))
+particles.push(new Electron(216 + 10 * 24, 248, 1))
+particles.push(new Electron(216 + 10 * 24, 178, 1))
+particles.push(new Electron(248 + 10 * 24, 216, 1))
+particles.push(new Electron(178 + 10 * 24, 216, 1))
 
 function drawLoop() {
     // setTimeout(drawLoop, 1000)
@@ -122,15 +103,17 @@ function drawLoop() {
     for (const particle of particles) {
         particle.draw()
         particle.simulate()
+    }
 
+    for (const particle of particles) {
         if (particle instanceof Nucleus) {
             particle.simulateShells()
         }
     }
 
     for (const particle of particles) {
-        particle.x += particle.vx * 0.1
-        particle.y += particle.vy * 0.1
+        particle.x += particle.vx * 1
+        particle.y += particle.vy * 1
     }
 }
 
