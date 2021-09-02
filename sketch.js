@@ -60,6 +60,10 @@ class Particle {
             let force =
                 particle.charge * Math.sign(this.charge) * i_distance ** 2
 
+            if (this.pair === particle) {
+                force -= 0.05
+            }
+
             this.force_added_x +=
                 force * (this.x - particle.x) * i_distance * 2 +
                 (Math.random() - 0.5) * 0.02
@@ -98,6 +102,8 @@ class Nucleus extends Particle {
 
     simulateShells() {
         let electrons = []
+
+        const max_shell = Math.ceil(Math.sqrt(this.charge / 2))
 
         // Initial shell position
         for (const particle of particles) {
@@ -162,28 +168,30 @@ class Nucleus extends Particle {
             }
         }
 
-        for (let i = electrons.length - 1; i >= 0; i--) {
-            if (electrons[i].shell > Math.ceil(Math.sqrt(this.charge / 2))) {
-                electrons[i].electron.shell.delete(this)
-                electrons.splice(i, 1)
-            }
-        }
-
         // Make sure electron pairs have certain properties
         for (const { shell, electron } of electrons) {
-            if (electron.pair === null) continue
+            if (electron.pair === null || shell > max_shell) continue
 
+            // They must actually be pairs instead of a weird chain or pairs with nothing
             if (electron.pair.pair !== electron) {
                 electron.pair = null
                 continue
             }
 
+            // They must be in the same electron shell
             if (electron.pair.shell.get(this) !== shell) electron.pair = null
+        }
+
+        for (let i = electrons.length - 1; i >= 0; i--) {
+            if (electrons[i].shell > max_shell) {
+                electrons[i].electron.shell.delete(this)
+                electrons.splice(i, 1)
+            }
         }
 
         for (
             let shell_number = 1;
-            shell_number < shells.length + 1;
+            shell_number <= Math.ceil(Math.sqrt(this.charge / 2));
             shell_number++
         ) {
             let shell = shells[shell_number]
@@ -193,22 +201,48 @@ class Nucleus extends Particle {
             let pairless_in_shell = shell.filter(e => !e.electron.pair)
 
             let pairs_needed =
-                pairless_in_shell.length - 2 * (shell_number - 1) + 1
+                pairless_in_shell.length - (2 * (shell_number - 1) + 1)
 
-            if (pairs_needed < 0) {
-                // Randomly get rid of pairs
-                for (let i = 0; i < Math.abs(pairs_needed); i++) {
-                    let random = shell[Math.floor(Math.random() * shell.length)]
+            // debugger
 
-                    while (!random || !random.pair) {
-                        random = shell[Math.floor(Math.random() * shell.length)]
-                    }
+            if (pairs_needed > 0) {
+                pairless_in_shell.sort(
+                    (a, b) =>
+                        Math.atan2(
+                            this.y - a.electron.y,
+                            this.x - a.electron.y
+                        ) -
+                        Math.atan2(this.y - b.electron.y, this.x - b.electron.x)
+                )
 
-                    random.pair.pair = null
-                    random.pair = null
+                let total_dist_1 = 0
+                let total_dist_2 = 0
+
+                for (let i = 0; i < pairs_needed; i++) {
+                    let e1 = pairless_in_shell[i * 2].electron
+                    let e2 = pairless_in_shell[i * 2 + 1].electron
+                    total_dist_1 += dist(e1.x, e1.y, e2.x, e2.y)
                 }
-            } else if (pairs_needed > 0) {
-                pairless_in_shell.sort((a, b) => Math.atan2() - Math.atan2())
+
+                pairless_in_shell.push(pairless_in_shell.shift())
+
+                for (let i = 0; i < pairs_needed; i++) {
+                    let e1 = pairless_in_shell[i * 2].electron
+                    let e2 = pairless_in_shell[i * 2 + 1].electron
+                    total_dist_2 += dist(e1.x, e1.y, e2.x, e2.y)
+                }
+
+                if (total_dist_1 < total_dist_2) {
+                    pairless_in_shell.unshift(pairless_in_shell.pop())
+                }
+
+                for (let i = 0; i < pairs_needed; i++) {
+                    let e1 = pairless_in_shell[i * 2].electron
+                    let e2 = pairless_in_shell[i * 2 + 1].electron
+
+                    e1.pair = e2
+                    e2.pair = e1
+                }
             }
         }
 
@@ -240,13 +274,13 @@ class Nucleus extends Particle {
                 rel_y
             ).distance
 
-            if (force_added > 0.5) {
-                electron_with_data.shell++
-            }
+            // if (force_added > 0.5) {
+            //     electron_with_data.shell++
+            // }
 
-            if (force_added < -0.1 && electron_with_data.shell > 1) {
-                electron_with_data.shell--
-            }
+            // if (force_added < -0.1 && electron_with_data.shell > 1) {
+            //     electron_with_data.shell--
+            // }
 
             electron.vx += x_force
             electron.vy += y_force
@@ -292,7 +326,10 @@ function addAtom(x, y, protons, angle_offset = 0, vx = 0, vy = 0) {
         let shell_amt = shells[i]
 
         for (let j = 0; j < shell_amt; j++) {
-            let angle = (j / shell_amt) * (Math.PI * 2) + angle_offset
+            let angle =
+                ((j % 2 === 0 ? j / 2 : j / 2 - 0.4) / shell_amt) *
+                    (Math.PI * 2) +
+                angle_offset
 
             particles.push(
                 new Electron(
@@ -323,8 +360,8 @@ for (let i = 0; i < 10; i++) {
     let randY = Math.random() * 600
 
     addAtom(randX, randY, 6, 0, 0.5) // Oxygen
-    addAtom(randX + 40, randY - 40, 1, (Math.PI * 2) / 3, 0.5) // Hydrogen
-    addAtom(randX - 40, randY - 40, 1, (Math.PI * 1) / 3, 0.5) // Hydrogen
+    addAtom(randX + 35, randY - 35, 1, (Math.PI * 2) / 3, 0.5) // Hydrogen
+    addAtom(randX - 35, randY - 35, 1, (Math.PI * 1) / 3, 0.5) // Hydrogen
 
     // addAtom(randX + 400, randY, 11, 0, -0.5, 0) // Sodium
 }
