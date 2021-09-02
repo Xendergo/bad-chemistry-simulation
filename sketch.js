@@ -9,8 +9,7 @@ window.onresize = () => {
 c.width = window.innerWidth
 c.height = window.innerHeight
 
-let frame = 0
-
+// Constants
 const shellInterval = 16
 
 function dist(x1, y1, x2, y2) {
@@ -56,8 +55,10 @@ class Particle {
             if (particle === this) continue
 
             let i_distance =
-                1 / Math.max(dist(this.x, this.y, particle.x, particle.y), 1)
-            let force = particle.charge * this.charge * i_distance ** 2
+                1 /
+                Math.max(dist(this.x, this.y, particle.x, particle.y) / 2, 1)
+            let force =
+                particle.charge * Math.sign(this.charge) * i_distance ** 2
 
             this.force_added_x +=
                 force * (this.x - particle.x) * i_distance * 2 +
@@ -102,12 +103,9 @@ class Nucleus extends Particle {
         for (const particle of particles) {
             if (!(particle instanceof Electron)) continue
 
-            if (
-                particle.shell.has(this) &&
-                frame - particle.shell.get(this)[0] < 30
-            ) {
+            if (particle.shell.has(this)) {
                 electrons.push({
-                    shell: particle.shell.get(this)[1],
+                    shell: particle.shell.get(this),
                     electron: particle,
                 })
 
@@ -122,6 +120,7 @@ class Nucleus extends Particle {
 
         let shells = []
 
+        // Group electrons by shell
         for (const electron of electrons) {
             if (shells[electron.shell] === undefined)
                 shells[electron.shell] = []
@@ -132,7 +131,7 @@ class Nucleus extends Particle {
         // Kick out electrons when a shell is too crowded
         for (
             let shell_number = 1;
-            shell_number < shells.length + 1;
+            shell_number < shells.length;
             shell_number++
         ) {
             let shell = shells[shell_number]
@@ -170,6 +169,49 @@ class Nucleus extends Particle {
             }
         }
 
+        // Make sure electron pairs have certain properties
+        for (const { shell, electron } of electrons) {
+            if (electron.pair === null) continue
+
+            if (electron.pair.pair !== electron) {
+                electron.pair = null
+                continue
+            }
+
+            if (electron.pair.shell.get(this) !== shell) electron.pair = null
+        }
+
+        for (
+            let shell_number = 1;
+            shell_number < shells.length + 1;
+            shell_number++
+        ) {
+            let shell = shells[shell_number]
+
+            if (shell === undefined) continue
+
+            let pairless_in_shell = shell.filter(e => !e.electron.pair)
+
+            let pairs_needed =
+                pairless_in_shell.length - 2 * (shell_number - 1) + 1
+
+            if (pairs_needed < 0) {
+                // Randomly get rid of pairs
+                for (let i = 0; i < Math.abs(pairs_needed); i++) {
+                    let random = shell[Math.floor(Math.random() * shell.length)]
+
+                    while (!random || !random.pair) {
+                        random = shell[Math.floor(Math.random() * shell.length)]
+                    }
+
+                    random.pair.pair = null
+                    random.pair = null
+                }
+            } else if (pairs_needed > 0) {
+                pairless_in_shell.sort((a, b) => Math.atan2() - Math.atan2())
+            }
+        }
+
         for (const electron_with_data of electrons) {
             let { shell, electron } = electron_with_data
 
@@ -198,23 +240,23 @@ class Nucleus extends Particle {
                 rel_y
             ).distance
 
-            if (force_added > 0.01) {
+            if (force_added > 0.5) {
                 electron_with_data.shell++
             }
 
-            if (force_added < -0.01 && electron_with_data.shell > 1) {
+            if (force_added < -0.1 && electron_with_data.shell > 1) {
                 electron_with_data.shell--
             }
 
             electron.vx += x_force
             electron.vy += y_force
 
-            this.vx -= x_force
-            this.vy -= y_force
+            this.vx -= x_force / this.charge
+            this.vy -= y_force / this.charge
         }
 
         for (const { shell, electron } of electrons) {
-            electron.shell.set(this, [frame, shell])
+            electron.shell.set(this, shell)
         }
     }
 }
@@ -225,6 +267,7 @@ class Electron extends Particle {
     }
 
     shell = new Map()
+    pair = null
 
     draw() {
         draw.fillStyle = "yellow"
@@ -275,7 +318,7 @@ function addAtom(x, y, protons, angle_offset = 0, vx = 0, vy = 0) {
 // particles.push(new Electron(255, 232))
 // particles.push(new Electron(255, 168))
 
-for (let i = 0; i < 1; i++) {
+for (let i = 0; i < 10; i++) {
     let randX = Math.random() * 600
     let randY = Math.random() * 600
 
@@ -311,8 +354,6 @@ function drawLoop() {
         particle.x += particle.vx * 1
         particle.y += particle.vy * 1
     }
-
-    frame++
 }
 
-drawLoop()
+requestAnimationFrame(drawLoop)
