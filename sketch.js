@@ -178,8 +178,12 @@ class Nucleus extends Particle {
                 continue
             }
 
-            // They must be in the same electron shell
-            if (electron.pair.shell.get(this) !== shell) electron.pair = null
+            // They must be in an electron shell and in the same shell
+            if (
+                electron.shell.size === 0 ||
+                electron.pair.shell.get(this) !== shell
+            )
+                electron.pair = null
         }
 
         for (let i = electrons.length - 1; i >= 0; i--) {
@@ -328,6 +332,7 @@ function addAtom(x, y, protons, angle_offset = 0, vx = 0, vy = 0) {
         for (let j = 0; j < shell_amt; j++) {
             let angle =
                 ((j % 2 === 0 ? j / 2 : j / 2 - 0.4) / shell_amt) *
+                    2 *
                     (Math.PI * 2) +
                 angle_offset
 
@@ -343,31 +348,31 @@ function addAtom(x, y, protons, angle_offset = 0, vx = 0, vy = 0) {
     }
 }
 
-// particles.push(new Nucleus(200, 200, 6))
-// particles.push(new Nucleus(310, 136, 1))
-// particles.push(new Nucleus(89, 136, 1))
-// particles.push(new Electron(200, 232))
-// particles.push(new Electron(200, 168))
-// particles.push(new Electron(200, 264))
-// particles.push(new Electron(200, 136))
-// particles.push(new Electron(144, 167))
-// particles.push(new Electron(144, 232))
-// particles.push(new Electron(255, 232))
-// particles.push(new Electron(255, 168))
+// for (let i = 0; i < 10; i++) {
+//     let randX = Math.random() * 600
+//     let randY = Math.random() * 600
 
-for (let i = 0; i < 10; i++) {
-    let randX = Math.random() * 600
-    let randY = Math.random() * 600
+//     addAtom(randX, randY, 8, 0, 0.5) // Oxygen
+//     addAtom(randX + 35, randY - 35, 1, (Math.PI * 2) / 3, 0.5) // Hydrogen
+//     addAtom(randX - 35, randY - 35, 1, (Math.PI * 1) / 3, 0.5) // Hydrogen
 
-    addAtom(randX, randY, 6, 0, 0.5) // Oxygen
-    addAtom(randX + 35, randY - 35, 1, (Math.PI * 2) / 3, 0.5) // Hydrogen
-    addAtom(randX - 35, randY - 35, 1, (Math.PI * 1) / 3, 0.5) // Hydrogen
+//     addAtom(randX + 400, randY, 11, 0, -0.5, 0) // Sodium
+// }
 
-    // addAtom(randX + 400, randY, 11, 0, -0.5, 0) // Sodium
-}
-
-// addAtom(500, 200, 1, 0, 1)
-// particles.push(new Electron(484, 200, 0, 0))
+addAtom(500, 200, 1)
+addAtom(548, 200, 8)
+addAtom(612, 200, 6)
+addAtom(612, 248, 1, -Math.PI / 2)
+addAtom(612, 152, 1, Math.PI / 2)
+addAtom(676, 200, 6)
+addAtom(676, 152, 1, Math.PI / 2)
+addAtom(676, 264, 7, -Math.PI / 2)
+addAtom(676, 312, 1, -Math.PI / 2)
+addAtom(635, 290, 1, -Math.PI / 3)
+addAtom(717, 290, 1, (-Math.PI * 2) / 3)
+addAtom(740, 200, 6)
+addAtom(740, 136, 8, Math.PI / 2)
+addAtom(804, 200, 8, Math.PI / 6)
 
 function drawLoop() {
     // setTimeout(drawLoop, 100)
