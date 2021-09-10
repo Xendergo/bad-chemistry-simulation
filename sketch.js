@@ -1,13 +1,22 @@
-const c = document.getElementById("c")
-const draw = c.getContext("2d")
+const scene = new THREE.Scene()
+const renderer = new THREE.WebGLRenderer()
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 2000)
+
+camera.position.z = 200
+
+const ELECTRON_MATERIAL = new THREE.MeshBasicMaterial({color: 0xffff00})
+const ELECTRON_GEOMETRY = new THREE.SphereGeometry(1)
+
+const NUCLEUS_MATERIAL = new THREE.MeshBasicMaterial({color: 0xff0000})
+
+document.body.appendChild(renderer.domElement)
 
 window.onresize = () => {
-    c.width = window.innerWidth
-    c.height = window.innerHeight
+    renderer.setSize(window.innerWidth, window.innerHeight)
+    camera.aspect = window.innerWidth/window.innerHeight
 }
 
-c.width = window.innerWidth
-c.height = window.innerHeight
+window.onresize()
 
 // Constants
 const shellInterval = 16
@@ -80,25 +89,26 @@ class Particle {
 class Nucleus extends Particle {
     constructor(x, y, vx, vy, charge) {
         super(x, y, vx, vy, charge)
+
+        const geometry = new THREE.SphereGeometry(Math.sqrt(this.charge) * 2)
+
+        this.mesh = new THREE.Mesh(geometry, NUCLEUS_MATERIAL)
+
+        scene.add(this.mesh)
     }
 
     shells = []
+    mesh
 
-    draw() {
-        draw.fillStyle = "red"
+    // draw() {
+    //     for (let i = 1; i <= Math.ceil(Math.sqrt(this.charge / 2)); i++) {
+    //         draw.strokeStyle = `rgba(255, 255, 255, ${0.25 / i})`
 
-        draw.beginPath()
-        draw.arc(this.x, this.y, Math.sqrt(this.charge) * 2, 0, Math.PI * 2)
-        draw.fill()
-
-        for (let i = 1; i <= Math.ceil(Math.sqrt(this.charge / 2)); i++) {
-            draw.strokeStyle = `rgba(255, 255, 255, ${0.25 / i})`
-
-            draw.beginPath()
-            draw.arc(this.x, this.y, i * shellInterval, 0, Math.PI * 2)
-            draw.stroke()
-        }
-    }
+    //         draw.beginPath()
+    //         draw.arc(this.x, this.y, i * shellInterval, 0, Math.PI * 2)
+    //         draw.stroke()
+    //     }
+    // }
 
     simulateShells() {
         let electrons = []
@@ -302,17 +312,15 @@ class Nucleus extends Particle {
 class Electron extends Particle {
     constructor(x, y, vx, vy) {
         super(x, y, vx, vy, -1)
+
+        this.mesh = new THREE.Mesh(ELECTRON_GEOMETRY, ELECTRON_MATERIAL)
+
+        scene.add(this.mesh)
     }
 
     shell = new Map()
     pair = null
-
-    draw() {
-        draw.fillStyle = "yellow"
-        draw.beginPath()
-        draw.arc(this.x, this.y, 2, 0, Math.PI * 2)
-        draw.fill()
-    }
+    mesh
 }
 
 let particles = []
@@ -359,30 +367,26 @@ function addAtom(x, y, protons, angle_offset = 0, vx = 0, vy = 0) {
 //     addAtom(randX + 400, randY, 11, 0, -0.5, 0) // Sodium
 // }
 
-addAtom(500, 200, 1)
-addAtom(548, 200, 8)
-addAtom(612, 200, 6)
-addAtom(612, 248, 1, -Math.PI / 2)
-addAtom(612, 152, 1, Math.PI / 2)
-addAtom(676, 200, 6)
-addAtom(676, 152, 1, Math.PI / 2)
-addAtom(676, 264, 7, -Math.PI / 2)
-addAtom(676, 312, 1, -Math.PI / 2)
-addAtom(635, 290, 1, -Math.PI / 3)
-addAtom(717, 290, 1, (-Math.PI * 2) / 3)
-addAtom(740, 200, 6)
-addAtom(740, 136, 8, Math.PI / 2)
-addAtom(804, 200, 8, Math.PI / 6)
+addAtom(0, 0, 1)
+addAtom(48, 0, 8)
+addAtom(112, 0, 6)
+addAtom(112, 48, 1, -Math.PI / 2)
+addAtom(112, -48, 1, Math.PI / 2)
+addAtom(176, 0, 6)
+addAtom(176, -48, 1, Math.PI / 2)
+addAtom(176, 64, 7, -Math.PI / 2)
+addAtom(176, 112, 1, -Math.PI / 2)
+addAtom(135, 90, 1, -Math.PI / 3)
+addAtom(217, 90, 1, (-Math.PI * 2) / 3)
+addAtom(240, 0, 6)
+addAtom(240, -64, 8, Math.PI / 2)
+addAtom(304, 0, 8, Math.PI / 6)
 
 function drawLoop() {
     // setTimeout(drawLoop, 100)
     requestAnimationFrame(drawLoop)
 
-    draw.fillStyle = "black"
-    draw.fillRect(0, 0, c.width, c.height)
-
     for (const particle of particles) {
-        particle.draw()
         particle.simulate()
     }
 
@@ -396,6 +400,13 @@ function drawLoop() {
         particle.x += particle.vx * 1
         particle.y += particle.vy * 1
     }
+
+    for (const particle of particles) {
+        particle.mesh.position.x = particle.x
+        particle.mesh.position.y = particle.y
+    }
+
+    renderer.render(scene, camera)
 }
 
 requestAnimationFrame(drawLoop)
