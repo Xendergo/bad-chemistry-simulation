@@ -22,24 +22,6 @@ window.onresize()
 // Constants
 const shellInterval = 16
 
-function dist(x1, y1, x2, y2) {
-    
-}
-
-function project(fromX, fromY, toX, toY) {
-    let distance = dist(0, 0, toX, toY)
-    let scale = (fromX * toX + fromY * toY) / distance
-
-    let x = (toX * scale) / distance
-    let y = (toY * scale) / distance
-
-    return {
-        x: x,
-        y: y,
-        distance: Math.sqrt(x ** 2 + y ** 2),
-    }
-}
-
 class Vector {
     /**
      * Construct a new vector with these X, Y, & Z components
@@ -78,34 +60,53 @@ class Vector {
      */
     z
 
+    get magnitude() {
+        return this.dist(Vector.Zero)
+    }
+    
     /**
-     * Return a new normalized version of the vector
-     * @returns {Vector}
+     * Get the distance from this vector to another vector
+     * @param {Vector} other 
+     * @returns {number}
      */
-    normalize() {
-        let len = Vector.Zero.dist(this)
+    dist(other) {
+        return Math.sqrt((this.x - other.x) ** 2 + (this.y - other.y) ** 2 + (this.z - other.z) ** 2)
+    }
 
-        return this.scale(1 / len)
+    /**
+     * Get the dot product between this vector and the other vector
+     * @param {Vector} other 
+     * @returns {number}
+     */
+    dot(other) {
+        return this.x * other.x + this.y * other.y + this.z * other.z
+    }
+    
+    /**
+     * Get the angle between this vector and the other vector
+     * @param {*} other 
+     * @returns 
+     */
+    angle_between(other) {
+        return Math.acos(this.dot(other) / this.magnitude * other.magnitude)
+    }
+    
+    /**
+     * A normalized version of the vector
+     */
+    get normalize() {
+        return this.scale(1 / this.magnitude)
     }
 
     /**
      * Normalize the vector
      */
     normalize_eq() {
-        let len = Vector.Zero.dist(this)
+        let len = this.magnitude
 
         this.x /= len
         this.y /= len
         this.z /= len
-    }
-
-    /**
-     * Get the distance from this vector to another vector
-     * @param {Vector} other 
-     * @returns {Vector}
-     */
-    dist(other) {
-        return Math.sqrt((this.x - other.x) ** 2 + (this.y - other.y) ** 2 + (this.z - other.z) ** 2)
     }
 
     /**
@@ -125,6 +126,25 @@ class Vector {
         this.x  += other.x
         this.y += other.y
         this.z += other.z
+    }
+
+    /**
+     * Returns a new vector with is this vector minus the other vector
+     * @param {Vector} other 
+     * @returns {Vector}
+     */
+    sub(other) {
+        return new Vector(this.x - other.x, this.y - other.y, this.z - other.z)
+    }
+
+    /**
+     * Subtract the other vector from this vector
+     * @param {Vector} other 
+     */
+    sub_eq(other) {
+        this.x -= other.x
+        this.y -= other.y
+        this.z -= other.z
     }
 
     /**
@@ -152,7 +172,7 @@ class Vector {
      * @returns {Vector}
      */
     project(other) {
-        let distance = Vector.Zero.dist(other)
+        let distance = other.magnitude
         let scale = (this.x * other.x + this.y * other.y + this.z * other.z) / distance
 
         let x = (other.x * scale) / distance
@@ -167,7 +187,7 @@ class Vector {
      * @param {Vector} other 
      */
     project_eq(other) {
-        let distance = Vector.Zero.dist(other)
+        let distance = other.magnitude
         let scale = (this.x * other.x + this.y * other.y + this.z * other.z) / distance
 
         this.x = (other.x * scale) / distance
@@ -181,9 +201,7 @@ class Vector {
      * @returns {Vector}
      */
     align(other) {
-        let len = Vector.Zero.dist(this)
-
-        return other.normalize().scale(len)
+        return other.normalize().scale(this.magnitude)
     }
 
     align_eq(other) {
@@ -196,32 +214,26 @@ class Vector {
 }
 
 class Particle {
-    constructor(x, y, vx, vy, charge) {
-        this.x = x
-        this.y = y
-        this.vx = vx
-        this.vy = vy
+    constructor(pos, velocity, charge) {
+        this.pos = pos
+        this.velocity = velocity
         this.charge = charge
     }
 
-    x
-    y
-    vx
-    vy
+    pos
+    velocity
     charge
-    force_added_x
-    force_added_y
+    force_added
 
     simulate() {
-        this.force_added_x = 0
-        this.force_added_y = 0
+        this.force_added = Vector.Zero
 
         for (const particle of particles) {
             if (particle === this) continue
 
             let i_distance =
                 1 /
-                Math.max(dist(this.x, this.y, particle.x, particle.y) / 2, 1)
+                Math.max(this.pos.dist(particle.pos.dist) / 2, 1)
             let force =
                 particle.charge * Math.sign(this.charge) * i_distance ** 2
 
@@ -229,22 +241,17 @@ class Particle {
                 force -= 0.05
             }
 
-            this.force_added_x +=
-                force * (this.x - particle.x) * i_distance * 2 +
-                (Math.random() - 0.5) * 0.02
-            this.force_added_y +=
-                force * (this.y - particle.y) * i_distance * 2 +
-                (Math.random() - 0.5) * 0.02
+            this.force_added.add_eq(this.pos.sub(particle.pos).scale(force * i_distance * 2))
+            this.force_added.add_eq(new Vector((Math.random() - 0.5) * 0.02, (Math.random() - 0.5) * 0.02, (Math.random() - 0.5) * 0.02))
         }
 
-        this.vx += this.force_added_x
-        this.vy += this.force_added_y
+        this.velocity.add_eq(this.force_added)
     }
 }
 
 class Nucleus extends Particle {
-    constructor(x, y, vx, vy, charge) {
-        super(x, y, vx, vy, charge)
+    constructor(pos, velocity, charge) {
+        super(pos, velocity, charge)
 
         const geometry = new THREE.SphereGeometry(Math.sqrt(this.charge) * 2)
 
@@ -284,7 +291,7 @@ class Nucleus extends Particle {
                 continue
             }
 
-            let distance = dist(this.x, this.y, particle.x, particle.y)
+            let distance = this.pos.dist(particle.pos)
             let closestShell = Math.max(Math.round(distance / shellInterval), 1)
 
             electrons.push({ shell: closestShell, electron: particle })
@@ -318,8 +325,8 @@ class Nucleus extends Particle {
             // Prioritize the electrons in the shell that are far away
             let sorted = shell.sort((a, b) => {
                 return (
-                    dist(this.x, this.y, b.electron.x, b.electron.y) -
-                    dist(this.x, this.y, a.electron.x, a.electron.y)
+                    this.pos.dist(b.electron.pos) -
+                    this.pos.dist(a.electron.pos)
                 )
             })
 
@@ -373,16 +380,11 @@ class Nucleus extends Particle {
             let pairs_needed =
                 pairless_in_shell.length - (2 * (shell_number - 1) + 1)
 
-            // debugger
-
             if (pairs_needed > 0) {
                 pairless_in_shell.sort(
                     (a, b) =>
-                        Math.atan2(
-                            this.y - a.electron.y,
-                            this.x - a.electron.y
-                        ) -
-                        Math.atan2(this.y - b.electron.y, this.x - b.electron.x)
+                        this.pos.angle_between(a.electron.pos) -
+                        this.pos.angle_between(b.electron.pos)
                 )
 
                 let total_dist_1 = 0
@@ -391,7 +393,7 @@ class Nucleus extends Particle {
                 for (let i = 0; i < pairs_needed; i++) {
                     let e1 = pairless_in_shell[i * 2].electron
                     let e2 = pairless_in_shell[i * 2 + 1].electron
-                    total_dist_1 += dist(e1.x, e1.y, e2.x, e2.y)
+                    total_dist_1 += e1.pos.dist(e2.pos)
                 }
 
                 pairless_in_shell.push(pairless_in_shell.shift())
@@ -399,7 +401,7 @@ class Nucleus extends Particle {
                 for (let i = 0; i < pairs_needed; i++) {
                     let e1 = pairless_in_shell[i * 2].electron
                     let e2 = pairless_in_shell[i * 2 + 1].electron
-                    total_dist_2 += dist(e1.x, e1.y, e2.x, e2.y)
+                    total_dist_2 += e1.pos.dist(e2.pos)
                 }
 
                 if (total_dist_1 < total_dist_2) {
@@ -419,30 +421,20 @@ class Nucleus extends Particle {
         for (const electron_with_data of electrons) {
             let { shell, electron } = electron_with_data
 
-            let rel_x = this.x - electron.x
-            let rel_y = this.y - electron.y
+            let rel = this.pos.sub(electron.pos)
 
-            let distance = dist(this.x, this.y, electron.x, electron.y)
+            let distance = this.pos.dist(electron.pos)
 
             let dist_from_shell = shell * shellInterval - distance
             let inverse_square = Math.min(1 / (distance * 0.1) ** 2, 1)
 
-            let projected = project(electron.vx, electron.vy, rel_x, rel_y)
+            let projected = electron.velocity.project(rel)
 
-            let x_force =
-                ((-dist_from_shell * rel_x) / distance - projected.x) *
-                inverse_square
+            let force = rel.scale(-dist_from_shell * (1/distance)).sub(projected).scale(inverse_square)
 
-            let y_force =
-                ((-dist_from_shell * rel_y) / distance - projected.y) *
-                inverse_square
-
-            let force_added = project(
-                electron.force_added_x,
-                electron.force_added_y,
-                rel_x,
-                rel_y
-            ).distance
+            let force_added = electron.force_added.project(
+                rel
+            ).dist(Vector.Zero)
 
             // if (force_added > 0.5) {
             //     electron_with_data.shell++
@@ -452,11 +444,8 @@ class Nucleus extends Particle {
             //     electron_with_data.shell--
             // }
 
-            electron.vx += x_force
-            electron.vy += y_force
-
-            this.vx -= x_force / this.charge
-            this.vy -= y_force / this.charge
+            electron.velocity.add_eq(force)
+            this.velocity.sub_eq(force.scale(1 / this.charge))
         }
 
         for (const { shell, electron } of electrons) {
@@ -482,7 +471,7 @@ class Electron extends Particle {
 let particles = []
 
 function addAtom(x, y, protons, angle_offset = 0, vx = 0, vy = 0) {
-    particles.push(new Nucleus(x, y, vx, vy, protons))
+    particles.push(new Nucleus(new Vector(x, y, 0), new Vector(vx, vy, 0), protons))
 
     let shells = [0, 0, 0, 0, 0, 0, 0, 0]
 
@@ -502,10 +491,10 @@ function addAtom(x, y, protons, angle_offset = 0, vx = 0, vy = 0) {
 
             particles.push(
                 new Electron(
-                    x + Math.cos(angle) * i * shellInterval,
-                    y + Math.sin(angle) * i * shellInterval,
-                    vx,
-                    vy
+                    new Vector(x + Math.cos(angle) * i * shellInterval,
+                    y + Math.sin(angle) * i * shellInterval, 0),
+                    new Vector(vx,
+                    vy, 0)
                 )
             )
         }
@@ -553,13 +542,11 @@ function drawLoop() {
     }
 
     for (const particle of particles) {
-        particle.x += particle.vx * 1
-        particle.y += particle.vy * 1
+        particle.pos.add_eq(particle.velocity.scale(1))
     }
 
     for (const particle of particles) {
-        particle.mesh.position.x = particle.x
-        particle.mesh.position.y = particle.y
+        particle.mesh.position = particle.pos
     }
 
     renderer.render(scene, camera)
