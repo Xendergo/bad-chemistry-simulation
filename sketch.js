@@ -3,6 +3,7 @@ const renderer = new THREE.WebGLRenderer()
 const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 2000)
 
 camera.position.z = 200
+camera.position.x = 100
 
 const ELECTRON_MATERIAL = new THREE.MeshBasicMaterial({color: 0xffff00})
 const ELECTRON_GEOMETRY = new THREE.SphereGeometry(1)
@@ -22,7 +23,7 @@ window.onresize()
 const shellInterval = 16
 
 function dist(x1, y1, x2, y2) {
-    return Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
+    
 }
 
 function project(fromX, fromY, toX, toY) {
@@ -36,6 +37,161 @@ function project(fromX, fromY, toX, toY) {
         x: x,
         y: y,
         distance: Math.sqrt(x ** 2 + y ** 2),
+    }
+}
+
+class Vector {
+    /**
+     * Construct a new vector with these X, Y, & Z components
+     * @param {number} x 
+     * @param {number} y 
+     * @param {number} z 
+     */
+    constructor(x, y, z) {
+        this.x = x
+        this.y = y
+        this.z = z
+    }
+
+    /**
+     * A vector with zero length
+     */
+    static get Zero() {
+        return new Vector(0, 0, 0)
+    }
+
+    /**
+     * X component
+     * @type {number}
+     */
+    x
+
+    /**
+     * Y component
+     * @type {number}
+     */
+    y
+
+    /**
+     * Z component
+     * @type {number}
+     */
+    z
+
+    /**
+     * Return a new normalized version of the vector
+     * @returns {Vector}
+     */
+    normalize() {
+        let len = Vector.Zero.dist(this)
+
+        return this.scale(1 / len)
+    }
+
+    /**
+     * Normalize the vector
+     */
+    normalize_eq() {
+        let len = Vector.Zero.dist(this)
+
+        this.x /= len
+        this.y /= len
+        this.z /= len
+    }
+
+    /**
+     * Get the distance from this vector to another vector
+     * @param {Vector} other 
+     * @returns {Vector}
+     */
+    dist(other) {
+        return Math.sqrt((this.x - other.x) ** 2 + (this.y - other.y) ** 2 + (this.z - other.z) ** 2)
+    }
+
+    /**
+     * Return a new vector which is the sum of this vector and the other
+     * @param {Vector} other 
+     * @returns {Vector}
+     */
+    add(other) {
+        return new Vector(this.x + other.x, this.y + other.y, this.z + other.z)
+    }
+
+    /**
+     * Add another vector to this vector
+     * @param {Vector} other 
+     */
+    add_eq(other) {
+        this.x  += other.x
+        this.y += other.y
+        this.z += other.z
+    }
+
+    /**
+     * Return a new vector which is this vector scaled by the factor
+     * @param {number} factor 
+     * @returns 
+     */
+    scale(factor) {
+        return new Vector(this.x * factor, this.y * factor, this.z * factor)
+    }
+
+    /**
+     * Scale this vector by the factor
+     * @param {number} factor 
+     */
+    scale_eq(factor) {
+        this.x *= factor
+        this.y *= factor
+        this.z *= factor
+    }
+
+    /**
+     * Return a new vector which is this vector projected onto the other vector
+     * @param {Vector} other 
+     * @returns {Vector}
+     */
+    project(other) {
+        let distance = Vector.Zero.dist(other)
+        let scale = (this.x * other.x + this.y * other.y + this.z * other.z) / distance
+
+        let x = (other.x * scale) / distance
+        let y = (other.y * scale) / distance
+        let z = (other.z * scale) / distance
+
+        return new Vector(x, y, z)
+    }
+
+    /**
+     * Align this vector to the other vector
+     * @param {Vector} other 
+     */
+    project_eq(other) {
+        let distance = Vector.Zero.dist(other)
+        let scale = (this.x * other.x + this.y * other.y + this.z * other.z) / distance
+
+        this.x = (other.x * scale) / distance
+        this.y = (other.y * scale) / distance
+        this.z = (other.z * scale) / distance
+    }
+
+    /**
+     * Return a new vector which is this vector rotated to the other vector
+     * @param {Vector} other 
+     * @returns {Vector}
+     */
+    align(other) {
+        let len = Vector.Zero.dist(this)
+
+        return other.normalize().scale(len)
+    }
+
+    align_eq(other) {
+        let aligned = this.align(other)
+
+        this.x = aligned.x
+        this.y = aligned.y
+        this.z = aligned.z
     }
 }
 
