@@ -5,10 +5,12 @@ const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerH
 camera.position.z = 200
 camera.position.x = 100
 
-const ELECTRON_MATERIAL = new THREE.MeshBasicMaterial({color: 0xffff00})
+const ELECTRON_MATERIAL = new THREE.MeshPhysicalMaterial({color: 0xffff00, clearcoat: 1, clearcoatRoughness: 0.75, emissive: 0x808000})
 const ELECTRON_GEOMETRY = new THREE.SphereGeometry(1)
 
-const NUCLEUS_MATERIAL = new THREE.MeshBasicMaterial({color: 0xff0000})
+const NUCLEUS_MATERIAL = new THREE.MeshPhysicalMaterial({color: 0xff0000, clearcoat: 1, clearcoatRoughness: 0.75, emissive: 0x800000})
+
+scene.add(new THREE.AmbientLight(0x404040))
 
 document.body.appendChild(renderer.domElement)
 
@@ -84,8 +86,8 @@ class Vector {
     
     /**
      * Get the angle between this vector and the other vector
-     * @param {*} other 
-     * @returns 
+     * @param {Vector} other 
+     * @returns {number}
      */
     angle_between(other) {
         return Math.acos(this.dot(other) / this.magnitude * other.magnitude)
@@ -102,11 +104,11 @@ class Vector {
      * Normalize the vector
      */
     normalize_eq() {
-        let len = this.magnitude
+        let len = 1 / this.magnitude
 
-        this.x /= len
-        this.y /= len
-        this.z /= len
+        this.x *= len
+        this.y *= len
+        this.z *= len
     }
 
     /**
@@ -218,12 +220,16 @@ class Particle {
         this.pos = pos
         this.velocity = velocity
         this.charge = charge
+
+        this.light = new THREE.PointLight(0x101010 * Math.abs(charge))
+        scene.add(this.light)
     }
 
     pos
     velocity
     charge
     force_added
+    light
 
     simulate() {
         this.force_added = Vector.Zero
@@ -233,7 +239,8 @@ class Particle {
 
             let i_distance =
                 1 /
-                Math.max(this.pos.dist(particle.pos.dist) / 2, 1)
+                Math.max(this.pos.dist(particle.pos) / 2, 1)
+
             let force =
                 particle.charge * Math.sign(this.charge) * i_distance ** 2
 
@@ -256,12 +263,12 @@ class Nucleus extends Particle {
         const geometry = new THREE.SphereGeometry(Math.sqrt(this.charge) * 2)
 
         this.mesh = new THREE.Mesh(geometry, NUCLEUS_MATERIAL)
-
         scene.add(this.mesh)
     }
 
     shells = []
     mesh
+    light
 
     // draw() {
     //     for (let i = 1; i <= Math.ceil(Math.sqrt(this.charge / 2)); i++) {
@@ -455,8 +462,8 @@ class Nucleus extends Particle {
 }
 
 class Electron extends Particle {
-    constructor(x, y, vx, vy) {
-        super(x, y, vx, vy, -1)
+    constructor(pos, velocity) {
+        super(pos, velocity, -1)
 
         this.mesh = new THREE.Mesh(ELECTRON_GEOMETRY, ELECTRON_MATERIAL)
 
@@ -546,7 +553,15 @@ function drawLoop() {
     }
 
     for (const particle of particles) {
-        particle.mesh.position = particle.pos
+        particle.mesh.position.x = particle.pos.x
+        particle.mesh.position.y = particle.pos.y
+        particle.mesh.position.z = particle.pos.z
+
+        if (particle.light) {
+            particle.light.position.x = particle.pos.x
+            particle.light.position.y = particle.pos.y
+            particle.light.position.z = particle.pos.z
+        }
     }
 
     renderer.render(scene, camera)
