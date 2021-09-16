@@ -1,3 +1,5 @@
+import * as THREE from "https://cdn.skypack.dev/three@0.132.2"
+
 const scene = new THREE.Scene()
 const renderer = new THREE.WebGLRenderer()
 const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 2000)
@@ -5,12 +7,27 @@ const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerH
 camera.position.z = 200
 camera.position.x = 100
 
+const keys = {}
+
+window.onkeydown = (e) => {
+    keys[e.key.toLowerCase()] = true
+}
+
+window.onkeyup = (e) => {
+    keys[e.key.toLowerCase()] = false
+}
+
 const ELECTRON_MATERIAL = new THREE.MeshPhysicalMaterial({color: 0xffff00, clearcoat: 1, clearcoatRoughness: 0.75, emissive: 0x808000})
 const ELECTRON_GEOMETRY = new THREE.SphereGeometry(1)
 
 const NUCLEUS_MATERIAL = new THREE.MeshPhysicalMaterial({color: 0xff0000, clearcoat: 1, clearcoatRoughness: 0.75, emissive: 0x800000})
 
 scene.add(new THREE.AmbientLight(0x404040))
+
+const quat_up = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.01, 0, 0))
+const quat_down = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.01, 0, 0))
+const quat_left = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0.01, 0))
+const quat_right = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -0.01, 0))
 
 document.body.appendChild(renderer.domElement)
 
@@ -23,197 +40,6 @@ window.onresize()
 
 // Constants
 const shellInterval = 16
-
-class Vector {
-    /**
-     * Construct a new vector with these X, Y, & Z components
-     * @param {number} x 
-     * @param {number} y 
-     * @param {number} z 
-     */
-    constructor(x, y, z) {
-        this.x = x
-        this.y = y
-        this.z = z
-    }
-
-    /**
-     * A vector with zero length
-     */
-    static get Zero() {
-        return new Vector(0, 0, 0)
-    }
-
-    /**
-     * X component
-     * @type {number}
-     */
-    x
-
-    /**
-     * Y component
-     * @type {number}
-     */
-    y
-
-    /**
-     * Z component
-     * @type {number}
-     */
-    z
-
-    get magnitude() {
-        return this.dist(Vector.Zero)
-    }
-    
-    /**
-     * Get the distance from this vector to another vector
-     * @param {Vector} other 
-     * @returns {number}
-     */
-    dist(other) {
-        return Math.sqrt((this.x - other.x) ** 2 + (this.y - other.y) ** 2 + (this.z - other.z) ** 2)
-    }
-
-    /**
-     * Get the dot product between this vector and the other vector
-     * @param {Vector} other 
-     * @returns {number}
-     */
-    dot(other) {
-        return this.x * other.x + this.y * other.y + this.z * other.z
-    }
-    
-    /**
-     * Get the angle between this vector and the other vector
-     * @param {Vector} other 
-     * @returns {number}
-     */
-    angle_between(other) {
-        return Math.acos(this.dot(other) / this.magnitude * other.magnitude)
-    }
-    
-    /**
-     * A normalized version of the vector
-     */
-    get normalize() {
-        return this.scale(1 / this.magnitude)
-    }
-
-    /**
-     * Normalize the vector
-     */
-    normalize_eq() {
-        let len = 1 / this.magnitude
-
-        this.x *= len
-        this.y *= len
-        this.z *= len
-    }
-
-    /**
-     * Return a new vector which is the sum of this vector and the other
-     * @param {Vector} other 
-     * @returns {Vector}
-     */
-    add(other) {
-        return new Vector(this.x + other.x, this.y + other.y, this.z + other.z)
-    }
-
-    /**
-     * Add another vector to this vector
-     * @param {Vector} other 
-     */
-    add_eq(other) {
-        this.x  += other.x
-        this.y += other.y
-        this.z += other.z
-    }
-
-    /**
-     * Returns a new vector with is this vector minus the other vector
-     * @param {Vector} other 
-     * @returns {Vector}
-     */
-    sub(other) {
-        return new Vector(this.x - other.x, this.y - other.y, this.z - other.z)
-    }
-
-    /**
-     * Subtract the other vector from this vector
-     * @param {Vector} other 
-     */
-    sub_eq(other) {
-        this.x -= other.x
-        this.y -= other.y
-        this.z -= other.z
-    }
-
-    /**
-     * Return a new vector which is this vector scaled by the factor
-     * @param {number} factor 
-     * @returns 
-     */
-    scale(factor) {
-        return new Vector(this.x * factor, this.y * factor, this.z * factor)
-    }
-
-    /**
-     * Scale this vector by the factor
-     * @param {number} factor 
-     */
-    scale_eq(factor) {
-        this.x *= factor
-        this.y *= factor
-        this.z *= factor
-    }
-
-    /**
-     * Return a new vector which is this vector projected onto the other vector
-     * @param {Vector} other 
-     * @returns {Vector}
-     */
-    project(other) {
-        let distance = other.magnitude
-        let scale = (this.x * other.x + this.y * other.y + this.z * other.z) / distance
-
-        let x = (other.x * scale) / distance
-        let y = (other.y * scale) / distance
-        let z = (other.z * scale) / distance
-
-        return new Vector(x, y, z)
-    }
-
-    /**
-     * Align this vector to the other vector
-     * @param {Vector} other 
-     */
-    project_eq(other) {
-        let distance = other.magnitude
-        let scale = (this.x * other.x + this.y * other.y + this.z * other.z) / distance
-
-        this.x = (other.x * scale) / distance
-        this.y = (other.y * scale) / distance
-        this.z = (other.z * scale) / distance
-    }
-
-    /**
-     * Return a new vector which is this vector rotated to the other vector
-     * @param {Vector} other 
-     * @returns {Vector}
-     */
-    align(other) {
-        return other.normalize().scale(this.magnitude)
-    }
-
-    align_eq(other) {
-        let aligned = this.align(other)
-
-        this.x = aligned.x
-        this.y = aligned.y
-        this.z = aligned.z
-    }
-}
 
 class Particle {
     constructor(pos, velocity, charge) {
@@ -232,14 +58,14 @@ class Particle {
     light
 
     simulate() {
-        this.force_added = Vector.Zero
+        this.force_added = new THREE.Vector3(0, 0, 0)
 
         for (const particle of particles) {
             if (particle === this) continue
 
             let i_distance =
                 1 /
-                Math.max(this.pos.dist(particle.pos) / 2, 1)
+                Math.max(this.pos.distanceTo(particle.pos) / 2, 1)
 
             let force =
                 particle.charge * Math.sign(this.charge) * i_distance ** 2
@@ -248,11 +74,11 @@ class Particle {
                 force -= 0.05
             }
 
-            this.force_added.add_eq(this.pos.sub(particle.pos).scale(force * i_distance * 2))
-            this.force_added.add_eq(new Vector((Math.random() - 0.5) * 0.02, (Math.random() - 0.5) * 0.02, (Math.random() - 0.5) * 0.02))
+            this.force_added.add(this.pos.clone().sub(particle.pos).multiplyScalar(force * i_distance * 2))
+            this.force_added.add(new THREE.Vector3((Math.random() - 0.5) * 0.02, (Math.random() - 0.5) * 0.02, (Math.random() - 0.5) * 0.02))
         }
 
-        this.velocity.add_eq(this.force_added)
+        this.velocity.add(this.force_added)
     }
 }
 
@@ -298,7 +124,7 @@ class Nucleus extends Particle {
                 continue
             }
 
-            let distance = this.pos.dist(particle.pos)
+            let distance = this.pos.distanceTo(particle.pos)
             let closestShell = Math.max(Math.round(distance / shellInterval), 1)
 
             electrons.push({ shell: closestShell, electron: particle })
@@ -332,8 +158,8 @@ class Nucleus extends Particle {
             // Prioritize the electrons in the shell that are far away
             let sorted = shell.sort((a, b) => {
                 return (
-                    this.pos.dist(b.electron.pos) -
-                    this.pos.dist(a.electron.pos)
+                    this.pos.distanceTo(b.electron.pos) -
+                    this.pos.distanceTo(a.electron.pos)
                 )
             })
 
@@ -390,8 +216,8 @@ class Nucleus extends Particle {
             if (pairs_needed > 0) {
                 pairless_in_shell.sort(
                     (a, b) =>
-                        this.pos.angle_between(a.electron.pos) -
-                        this.pos.angle_between(b.electron.pos)
+                        this.pos.angleTo(a.electron.pos) -
+                        this.pos.angleTo(b.electron.pos)
                 )
 
                 let total_dist_1 = 0
@@ -400,7 +226,7 @@ class Nucleus extends Particle {
                 for (let i = 0; i < pairs_needed; i++) {
                     let e1 = pairless_in_shell[i * 2].electron
                     let e2 = pairless_in_shell[i * 2 + 1].electron
-                    total_dist_1 += e1.pos.dist(e2.pos)
+                    total_dist_1 += e1.pos.distanceTo(e2.pos)
                 }
 
                 pairless_in_shell.push(pairless_in_shell.shift())
@@ -408,7 +234,7 @@ class Nucleus extends Particle {
                 for (let i = 0; i < pairs_needed; i++) {
                     let e1 = pairless_in_shell[i * 2].electron
                     let e2 = pairless_in_shell[i * 2 + 1].electron
-                    total_dist_2 += e1.pos.dist(e2.pos)
+                    total_dist_2 += e1.pos.distanceTo(e2.pos)
                 }
 
                 if (total_dist_1 < total_dist_2) {
@@ -428,20 +254,20 @@ class Nucleus extends Particle {
         for (const electron_with_data of electrons) {
             let { shell, electron } = electron_with_data
 
-            let rel = this.pos.sub(electron.pos)
+            let rel = this.pos.clone().sub(electron.pos)
 
-            let distance = this.pos.dist(electron.pos)
+            let distance = this.pos.distanceTo(electron.pos)
 
             let dist_from_shell = shell * shellInterval - distance
             let inverse_square = Math.min(1 / (distance * 0.1) ** 2, 1)
 
-            let projected = electron.velocity.project(rel)
+            let projected = electron.velocity.clone().projectOnVector(rel)
 
-            let force = rel.scale(-dist_from_shell * (1/distance)).sub(projected).scale(inverse_square)
+            let force = rel.clone().multiplyScalar(-dist_from_shell * (1/distance)).sub(projected).multiplyScalar(inverse_square)
 
-            let force_added = electron.force_added.project(
+            let force_added = electron.force_added.projectOnVector(
                 rel
-            ).dist(Vector.Zero)
+            ).length()
 
             // if (force_added > 0.5) {
             //     electron_with_data.shell++
@@ -451,8 +277,8 @@ class Nucleus extends Particle {
             //     electron_with_data.shell--
             // }
 
-            electron.velocity.add_eq(force)
-            this.velocity.sub_eq(force.scale(1 / this.charge))
+            electron.velocity.add(force)
+            this.velocity.sub(force.clone().multiplyScalar(1 / this.charge))
         }
 
         for (const { shell, electron } of electrons) {
@@ -478,7 +304,7 @@ class Electron extends Particle {
 let particles = []
 
 function addAtom(x, y, protons, angle_offset = 0, vx = 0, vy = 0) {
-    particles.push(new Nucleus(new Vector(x, y, 0), new Vector(vx, vy, 0), protons))
+    particles.push(new Nucleus(new THREE.Vector3(x, y, 0), new THREE.Vector3(vx, vy, 0), protons))
 
     let shells = [0, 0, 0, 0, 0, 0, 0, 0]
 
@@ -498,9 +324,9 @@ function addAtom(x, y, protons, angle_offset = 0, vx = 0, vy = 0) {
 
             particles.push(
                 new Electron(
-                    new Vector(x + Math.cos(angle) * i * shellInterval,
+                    new THREE.Vector3(x + Math.cos(angle) * i * shellInterval,
                     y + Math.sin(angle) * i * shellInterval, 0),
-                    new Vector(vx,
+                    new THREE.Vector3(vx,
                     vy, 0)
                 )
             )
@@ -538,6 +364,38 @@ function drawLoop() {
     // setTimeout(drawLoop, 100)
     requestAnimationFrame(drawLoop)
 
+    if (keys.w) {
+        camera.position.add(new THREE.Vector3(0, 0, -2).applyQuaternion(camera.quaternion))
+    }
+
+    if (keys.s) {
+        camera.position.add(new THREE.Vector3(0, 0, 2).applyQuaternion(camera.quaternion))
+    }
+
+    if (keys.a) {
+        camera.position.add(new THREE.Vector3(-2, 0, 0).applyQuaternion(camera.quaternion))
+    }
+    
+    if (keys.d) {
+        camera.position.add(new THREE.Vector3(2, 0, 0).applyQuaternion(camera.quaternion))
+    }
+
+    if (keys.arrowup) {
+        camera.quaternion.multiply(quat_up)
+    }
+
+    if (keys.arrowdown) {
+        camera.quaternion.multiply(quat_down)
+    }
+
+    if (keys.arrowleft) {
+        camera.quaternion.multiply(quat_left)
+    }
+
+    if (keys.arrowright) {
+        camera.quaternion.multiply(quat_right)
+    }
+
     for (const particle of particles) {
         particle.simulate()
     }
@@ -549,18 +407,14 @@ function drawLoop() {
     }
 
     for (const particle of particles) {
-        particle.pos.add_eq(particle.velocity.scale(1))
+        particle.pos.add(particle.velocity.clone().multiplyScalar(1))
     }
 
     for (const particle of particles) {
-        particle.mesh.position.x = particle.pos.x
-        particle.mesh.position.y = particle.pos.y
-        particle.mesh.position.z = particle.pos.z
+        particle.mesh.position.set(particle.pos.x, particle.pos.y, particle.pos.z)
 
         if (particle.light) {
-            particle.light.position.x = particle.pos.x
-            particle.light.position.y = particle.pos.y
-            particle.light.position.z = particle.pos.z
+            particle.light.position.set(particle.pos.x, particle.pos.y, particle.pos.z)
         }
     }
 
