@@ -2,44 +2,71 @@ import * as THREE from "https://cdn.skypack.dev/three@0.132.2"
 
 const scene = new THREE.Scene()
 const renderer = new THREE.WebGLRenderer()
-const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 2000)
+const camera = new THREE.PerspectiveCamera(
+    70,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    2000
+)
 
 camera.position.z = 200
 camera.position.x = 100
 
 const keys = {}
 
-window.onkeydown = (e) => {
+window.onkeydown = e => {
     keys[e.key.toLowerCase()] = true
 }
 
-window.onkeyup = (e) => {
+window.onkeyup = e => {
     keys[e.key.toLowerCase()] = false
 }
 
-const ELECTRON_MATERIAL = new THREE.MeshPhysicalMaterial({color: 0xffff00, clearcoat: 1, clearcoatRoughness: 0.75, emissive: 0x808000})
+const ELECTRON_MATERIAL = new THREE.MeshPhysicalMaterial({
+    color: 0xffff00,
+    clearcoat: 1,
+    clearcoatRoughness: 0.75,
+    emissive: 0x808000,
+})
 const ELECTRON_GEOMETRY = new THREE.SphereGeometry(1)
 
-const NUCLEUS_MATERIAL = new THREE.MeshPhysicalMaterial({color: 0xff0000, clearcoat: 1, clearcoatRoughness: 0.75, emissive: 0x800000})
+const NUCLEUS_MATERIAL = new THREE.MeshPhysicalMaterial({
+    color: 0xff0000,
+    clearcoat: 1,
+    clearcoatRoughness: 0.75,
+    emissive: 0x800000,
+})
 
 scene.add(new THREE.AmbientLight(0x404040))
 
 const quat_up = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.01, 0, 0))
-const quat_down = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.01, 0, 0))
-const quat_left = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0.01, 0))
-const quat_right = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -0.01, 0))
+const quat_down = new THREE.Quaternion().setFromEuler(
+    new THREE.Euler(-0.01, 0, 0)
+)
+const quat_left = new THREE.Quaternion().setFromEuler(
+    new THREE.Euler(0, 0.01, 0)
+)
+const quat_right = new THREE.Quaternion().setFromEuler(
+    new THREE.Euler(0, -0.01, 0)
+)
 
 document.body.appendChild(renderer.domElement)
 
 window.onresize = () => {
     renderer.setSize(window.innerWidth, window.innerHeight)
-    camera.aspect = window.innerWidth/window.innerHeight
+    camera.aspect = window.innerWidth / window.innerHeight
 }
 
 window.onresize()
 
 // Constants
-const shellInterval = 16
+const shellInterval = 0.5
+const angstrom = 32
+
+const electric_force = 0.002
+const pair_force = 0.05
+const shell_force = 0.1
+const randomness = 0.0003125
 
 class Particle {
     constructor(pos, velocity, charge) {
@@ -64,18 +91,24 @@ class Particle {
             if (particle === this) continue
 
             let i_distance =
-                1 /
-                Math.max(this.pos.distanceTo(particle.pos) / 2, 1)
+                1 / Math.max(this.pos.distanceTo(particle.pos) / 2, 1)
 
             let force =
                 particle.charge * Math.sign(this.charge) * i_distance ** 2
 
             if (this.pair === particle) {
-                force -= 0.05
+                force -= pair_force
             }
 
-            this.force_added.add(this.pos.clone().sub(particle.pos).multiplyScalar(force * i_distance * 2))
-            this.force_added.add(new THREE.Vector3((Math.random() - 0.5) * 0.02, (Math.random() - 0.5) * 0.02, (Math.random() - 0.5) * 0.02))
+            this.force_added.add(
+                this.pos
+                    .clone()
+                    .sub(particle.pos)
+                    .multiplyScalar(force * i_distance * electric_force)
+            )
+            this.force_added.add(
+                new THREE.Vector3(0, 0, 0).random().sub(new THREE.Vector3(0.5, 0.5, 0.5)).multiplyScalar(2 * randomness)
+            )
         }
 
         this.velocity.add(this.force_added)
@@ -259,15 +292,17 @@ class Nucleus extends Particle {
             let distance = this.pos.distanceTo(electron.pos)
 
             let dist_from_shell = shell * shellInterval - distance
-            let inverse_square = Math.min(1 / (distance * 0.1) ** 2, 1)
+            let inverse_square = Math.min(shell_force / (distance) ** 2, 1)
 
             let projected = electron.velocity.clone().projectOnVector(rel)
 
-            let force = rel.clone().multiplyScalar(-dist_from_shell * (1/distance)).sub(projected).multiplyScalar(inverse_square)
+            let force = rel
+                .clone()
+                .multiplyScalar(-dist_from_shell * (1 / distance))
+                .sub(projected)
+                .multiplyScalar(inverse_square)
 
-            let force_added = electron.force_added.projectOnVector(
-                rel
-            ).length()
+            let force_added = electron.force_added.projectOnVector(rel).length()
 
             // if (force_added > 0.5) {
             //     electron_with_data.shell++
@@ -304,7 +339,13 @@ class Electron extends Particle {
 let particles = []
 
 function addAtom(x, y, protons, angle_offset = 0, vx = 0, vy = 0) {
-    particles.push(new Nucleus(new THREE.Vector3(x, y, 0), new THREE.Vector3(vx, vy, 0), protons))
+    particles.push(
+        new Nucleus(
+            new THREE.Vector3(x, y, 0),
+            new THREE.Vector3(vx, vy, 0),
+            protons
+        )
+    )
 
     let shells = [0, 0, 0, 0, 0, 0, 0, 0]
 
@@ -324,10 +365,12 @@ function addAtom(x, y, protons, angle_offset = 0, vx = 0, vy = 0) {
 
             particles.push(
                 new Electron(
-                    new THREE.Vector3(x + Math.cos(angle) * i * shellInterval,
-                    y + Math.sin(angle) * i * shellInterval, 0),
-                    new THREE.Vector3(vx,
-                    vy, 0)
+                    new THREE.Vector3(
+                        x + Math.cos(angle) * i * shellInterval,
+                        y + Math.sin(angle) * i * shellInterval,
+                        0
+                    ),
+                    new THREE.Vector3(vx, vy, 0)
                 )
             )
         }
@@ -346,38 +389,46 @@ function addAtom(x, y, protons, angle_offset = 0, vx = 0, vy = 0) {
 // }
 
 addAtom(0, 0, 1)
-addAtom(48, 0, 8)
-addAtom(112, 0, 6)
-addAtom(112, 48, 1, -Math.PI / 2)
-addAtom(112, -48, 1, Math.PI / 2)
-addAtom(176, 0, 6)
-addAtom(176, -48, 1, Math.PI / 2)
-addAtom(176, 64, 7, -Math.PI / 2)
-addAtom(176, 112, 1, -Math.PI / 2)
-addAtom(135, 90, 1, -Math.PI / 3)
-addAtom(217, 90, 1, (-Math.PI * 2) / 3)
-addAtom(240, 0, 6)
-addAtom(240, -64, 8, Math.PI / 2)
-addAtom(304, 0, 8, Math.PI / 6)
+addAtom(1.5, 0, 8)
+addAtom(3.5, 0, 6)
+addAtom(3.5, 1.5, 1, -Math.PI / 2)
+addAtom(3.5, -1.5, 1, Math.PI / 2)
+addAtom(5.5, 0, 6)
+addAtom(5.5, -1.5, 1, Math.PI / 2)
+addAtom(5.5, 2, 7, -Math.PI / 2)
+addAtom(5.5, 3.5, 1, -Math.PI / 2)
+addAtom(4.21875, 2.8125, 1, -Math.PI / 3)
+addAtom(6.78125, 2.8125, 1, (-Math.PI * 2) / 3)
+addAtom(7.5, 0, 6)
+addAtom(7.5, -2, 8, Math.PI / 2)
+addAtom(9.5, 0, 8, Math.PI / 6)
 
 function drawLoop() {
     // setTimeout(drawLoop, 100)
     requestAnimationFrame(drawLoop)
 
     if (keys.w) {
-        camera.position.add(new THREE.Vector3(0, 0, -2).applyQuaternion(camera.quaternion))
+        camera.position.add(
+            new THREE.Vector3(0, 0, -2).applyQuaternion(camera.quaternion)
+        )
     }
 
     if (keys.s) {
-        camera.position.add(new THREE.Vector3(0, 0, 2).applyQuaternion(camera.quaternion))
+        camera.position.add(
+            new THREE.Vector3(0, 0, 2).applyQuaternion(camera.quaternion)
+        )
     }
 
     if (keys.a) {
-        camera.position.add(new THREE.Vector3(-2, 0, 0).applyQuaternion(camera.quaternion))
+        camera.position.add(
+            new THREE.Vector3(-2, 0, 0).applyQuaternion(camera.quaternion)
+        )
     }
-    
+
     if (keys.d) {
-        camera.position.add(new THREE.Vector3(2, 0, 0).applyQuaternion(camera.quaternion))
+        camera.position.add(
+            new THREE.Vector3(2, 0, 0).applyQuaternion(camera.quaternion)
+        )
     }
 
     if (keys.arrowup) {
@@ -411,10 +462,14 @@ function drawLoop() {
     }
 
     for (const particle of particles) {
-        particle.mesh.position.set(particle.pos.x, particle.pos.y, particle.pos.z)
+        particle.mesh.position
+            .set(particle.pos.x, particle.pos.y, particle.pos.z)
+            .multiplyScalar(angstrom)
 
         if (particle.light) {
-            particle.light.position.set(particle.pos.x, particle.pos.y, particle.pos.z)
+            particle.light.position
+                .set(particle.pos.x, particle.pos.y, particle.pos.z)
+                .multiplyScalar(angstrom)
         }
     }
 
