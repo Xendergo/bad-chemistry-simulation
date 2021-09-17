@@ -69,10 +69,11 @@ const shell_force = 0.1
 const randomness = 0.0003125
 
 class Particle {
-    constructor(pos, velocity, charge) {
+    constructor(pos, velocity, charge, mass) {
         this.pos = pos
         this.velocity = velocity
         this.charge = charge
+        this.mass = mass
 
         this.light = new THREE.PointLight(0x101010 * Math.abs(charge))
         scene.add(this.light)
@@ -81,11 +82,12 @@ class Particle {
     pos
     velocity
     charge
-    force_added
+    velocity_added
     light
+    mass
 
     simulate() {
-        this.force_added = new THREE.Vector3(0, 0, 0)
+        this.velocity_added = new THREE.Vector3(0, 0, 0)
 
         for (const particle of particles) {
             if (particle === this) continue
@@ -94,30 +96,35 @@ class Particle {
                 1 / Math.max(this.pos.distanceTo(particle.pos) / 2, 1)
 
             let force =
-                particle.charge * Math.sign(this.charge) * i_distance ** 2
+                particle.charge * this.charge * i_distance ** 2 * electric_force
 
             if (this.pair === particle) {
                 force -= pair_force
             }
 
-            this.force_added.add(
-                this.pos
-                    .clone()
-                    .sub(particle.pos)
-                    .multiplyScalar(force * i_distance * electric_force)
+            this.applyForce(
+                this.pos.clone().sub(particle.pos).multiplyScalar(force)
             )
-            this.force_added.add(
-                new THREE.Vector3(0, 0, 0).random().sub(new THREE.Vector3(0.5, 0.5, 0.5)).multiplyScalar(2 * randomness)
+
+            this.applyForce(
+                new THREE.Vector3(0, 0, 0)
+                    .random()
+                    .sub(new THREE.Vector3(0.5, 0.5, 0.5))
+                    .multiplyScalar(2 * randomness)
             )
         }
+    }
 
-        this.velocity.add(this.force_added)
+    applyForce(force) {
+        let toAdd = force.clone().divideScalar(this.mass)
+        this.velocity.add(toAdd)
+        this.velocity_added.add(toAdd)
     }
 }
 
 class Nucleus extends Particle {
     constructor(pos, velocity, charge) {
-        super(pos, velocity, charge)
+        super(pos, velocity, charge, charge)
 
         const geometry = new THREE.SphereGeometry(Math.sqrt(this.charge) * 2)
 
@@ -292,7 +299,7 @@ class Nucleus extends Particle {
             let distance = this.pos.distanceTo(electron.pos)
 
             let dist_from_shell = shell * shellInterval - distance
-            let inverse_square = Math.min(shell_force / (distance) ** 2, 1)
+            let inverse_square = Math.min(shell_force / distance ** 2, 1)
 
             let projected = electron.velocity.clone().projectOnVector(rel)
 
@@ -302,7 +309,7 @@ class Nucleus extends Particle {
                 .sub(projected)
                 .multiplyScalar(inverse_square)
 
-            let force_added = electron.force_added.projectOnVector(rel).length()
+            let force_added = electron.velocity_added.projectOnVector(rel).length()
 
             // if (force_added > 0.5) {
             //     electron_with_data.shell++
@@ -312,8 +319,8 @@ class Nucleus extends Particle {
             //     electron_with_data.shell--
             // }
 
-            electron.velocity.add(force)
-            this.velocity.sub(force.clone().multiplyScalar(1 / this.charge))
+            electron.applyForce(force)
+            this.applyForce(force.clone().negate())
         }
 
         for (const { shell, electron } of electrons) {
@@ -324,7 +331,7 @@ class Nucleus extends Particle {
 
 class Electron extends Particle {
     constructor(pos, velocity) {
-        super(pos, velocity, -1)
+        super(pos, velocity, -1, 1)
 
         this.mesh = new THREE.Mesh(ELECTRON_GEOMETRY, ELECTRON_MATERIAL)
 
